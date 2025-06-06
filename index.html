@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>KING OF TIME 授权测试</title>
+</head>
+<body>
+  <h2>KING OF TIME 授权连携示例1</h2>
+  <button id="startAuth">点击授权</button>
+
+  <p id="status" style="margin-top: 20px; color: green;"></p>
+
+  <script>
+    // ====== 1. 用户点击按钮跳转到 KOT 授权页面 ======
+    document.getElementById("startAuth").onclick = function () {
+      const clientId = "4a2649749b5c9fbaa737d9b4"; // ← 替换为你自己的 client_id
+      const redirectUri = "https://4u7uflrg78.execute-api.ap-northeast-1.amazonaws.com/kot-callback";
+      const state = "abc123xyz"; // 可使用随机字符串增强安全性
+
+      const authUrl =
+        "https://api.kingtime.jp/connect/kot/authorize?" +
+        "client_id=" + encodeURIComponent(clientId) +
+        "&response_type=code" +
+        "&response_mode=form_post" +
+        "&redirect_uri=" + encodeURIComponent(redirectUri) +
+        "&state=" + encodeURIComponent(state);
+
+      // 执行跳转到 KOT 页面
+      window.location.href = authUrl;
+    };
+
+    // ====== 2. 页面回调后接收 code 和 state（主要用 URL 参数接收） ======
+    window.onload = function () {
+      let code = null;
+      let state = null;
+
+      // 优先从 URL 参数取（KOT 大部分情况会 fallback 到 GET）
+      const urlParams = new URLSearchParams(window.location.search);
+      code = urlParams.get('code');
+      state = urlParams.get('state');
+
+      if (code) {
+        console.log("通过 URL 参数收到了 code:", code);
+        alert("收到 code: " + code);
+
+        document.getElementById("status").innerText = "授权成功，正在提交授权码...";
+
+        // 防止重复提交（加一个标志位）
+        if (!window.codeAlreadySent) {
+          window.codeAlreadySent = true;
+
+          // 向后端 Lambda 发送 code
+          fetch("https://4u7uflrg78.execute-api.ap-northeast-1.amazonaws.com/kot-callback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, state })
+          })
+          .then(res => {
+            if (res.ok) {
+              document.getElementById("status").innerText = "授权完成！即将跳转...";
+              setTimeout(() => {
+                window.location.href = "/device/management";
+              }, 1000);
+            } else {
+              document.getElementById("status").innerText = "授权失败，请重试。";
+            }
+          })
+          .catch(() => {
+            document.getElementById("status").innerText = "请求错误，网络异常。";
+          });
+        }
+
+      } else {
+        document.getElementById("status").innerText = "未收到授权 code，等待点击授权按钮。";
+      }
+    };
+  </script>
+</body>
+</html>
